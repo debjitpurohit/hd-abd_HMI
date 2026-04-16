@@ -218,7 +218,7 @@ function sendFrame(){
         const form=new FormData();
         form.append("image",blob,"frame.jpg");
 
-        fetch("https://hdabdmodel.onrender.com/detect",{
+        fetch("http://13.201.189.172:10000/detect",{
             method:"POST",
             body:form
         })
