@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>HD-ADB Tesla UI</title>
+
+<style>
+body{
+    margin:0;
+    background:#05070c;
+    font-family:Arial;
+    color:white;
+    overflow:hidden;
+}
+
+/* HEADER */
+.header{
+    height:60px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:0 20px;
+    background:rgba(10,15,25,0.9);
+    border-bottom:1px solid rgba(255,255,255,0.1);
+}
+
+.header h1{
+    color:#00e5ff;
+    font-size:15px;
+}
+
+/* LAYOUT */
+.container{
+    display:flex;
+    height:calc(100vh - 60px);
+}
+
+/* LEFT PANEL (INFO) */
+.left{
+    width:250px;
+    background:rgba(20,25,40,0.6);
+    padding:15px;
+}
+
+.card{
+    background:rgba(255,255,255,0.05);
+    padding:12px;
+    margin-bottom:10px;
+    border-radius:10px;
+}
+
+.status{
+    font-size:13px;
+    margin:5px 0;
+}
+
+/* RIGHT PANEL */
+.right{
+    flex:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    position:relative;
+}
+
+/* CAMERA BOX */
+.box{
+    width:900px;
+    height:600px;
+    position:relative;
+    border-radius:15px;
+    overflow:hidden;
+    border:1px solid rgba(0,229,255,0.3);
+}
+
+/* VIDEO + CANVAS */
+video, canvas{
+    position:absolute;
+    width:100%;
+    height:100%;
+    object-fit:cover;
+}
+
+/* GRID */
+.grid{
+    position:absolute;
+    width:100%;
+    height:100%;
+    pointer-events:none;
+    background:
+        linear-gradient(rgba(0,255,255,0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,255,255,0.08) 1px, transparent 1px);
+    background-size:90px 75px;
+}
+
+/* RIGHT CONTROL HUD */
+.controls{
+    position:absolute;
+    right:10px;
+    top:10px;
+    width:180px;
+    background:rgba(0,0,0,0.4);
+    padding:10px;
+    border-radius:10px;
+    font-size:12px;
+    border:1px solid rgba(0,255,255,0.2);
+}
+
+.toggle{
+    width:40px;
+    height:20px;
+    background:#333;
+    border-radius:20px;
+    position:relative;
+    cursor:pointer;
+    margin-top:5px;
+}
+
+.toggle::after{
+    content:"";
+    width:16px;
+    height:16px;
+    background:white;
+    position:absolute;
+    top:2px;
+    left:2px;
+    border-radius:50%;
+    transition:0.3s;
+}
+
+.toggle.active{
+    background:#00e5ff;
+}
+
+.toggle.active::after{
+    left:22px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">
+    <h1>HD-ADB MATRIX SYSTEM</h1>
+    <div>AUTONOMOUS HUD</div>
+</div>
+
+<div class="container">
+
+<!-- LEFT INFO -->
+<div class="left">
+    <div class="card">
+        <div class="status" id="obj">Objects: 0</div>
+        <div class="status" id="lane">Lane: --</div>
+        <div class="status" id="weather">Weather: --</div>
+    </div>
+</div>
+
+<!-- RIGHT CAMERA -->
+<div class="right">
+
+<div class="box">
+
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas"></canvas>
+    <div class="grid"></div>
+
+    <!-- RIGHT HUD CONTROLS -->
+    <div class="controls">
+        <div>Brightness</div>
+        <div class="toggle" id="bright"></div>
+
+        <div style="margin-top:10px;">Mode: AUTO</div>
+        <div>System: ACTIVE</div>
+    </div>
+
+</div>
+
+</div>
+
+</div>
+
+<script>
+
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+canvas.width = 900;
+canvas.height = 600;
+
+let bright=false;
+
+/* toggle */
+document.getElementById("bright").onclick=()=>{
+    bright=!bright;
+    document.getElementById("bright").classList.toggle("active");
+};
+
+/* CAMERA */
+navigator.mediaDevices.getUserMedia({video:true})
+.then(stream=>{
+    video.srcObject = stream;
+});
+
+/* SEND FRAME */
+function sendFrame(){
+
+    const temp=document.createElement("canvas");
+    temp.width=900;
+    temp.height=600;
+
+    const tctx=temp.getContext("2d");
+    tctx.drawImage(video,0,0,900,600);
+
+    temp.toBlob(blob=>{
+
+        const form=new FormData();
+        form.append("image",blob,"frame.jpg");
+
+        fetch("http://127.0.0.1:5000/detect",{
+            method:"POST",
+            body:form
+        })
+        .then(r=>r.json())
+        .then(draw)
+        .catch(e=>console.log(e));
+
+    },"image/jpeg");
+}
+
+/* DRAW */
+function draw(data){
+
+    ctx.clearRect(0,0,900,600);
+    ctx.drawImage(video,0,0,900,600);
+
+    /* OBJECTS */
+(data.objects||[]).forEach(o=>{
+
+    ctx.strokeStyle="#00e5ff";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(o.x1,o.y1,o.x2-o.x1,o.y2-o.y1);
+
+    ctx.font = "bold 10px Arial";
+
+    let text = o.label.toUpperCase();
+    let textWidth = ctx.measureText(text).width;
+
+    // background box
+    ctx.fillStyle = "rgba(0,229,255,0.25)";
+    ctx.fillRect(o.x1, o.y1 - 25, textWidth + 10, 20);
+
+    // text
+    ctx.fillStyle = "#00e5ff";
+    ctx.fillText(text, o.x1 + 5, o.y1 - 5);
+});
+
+    /* LANES */
+    (data.lanes||[]).forEach((l,i)=>{
+        ctx.strokeStyle=i?"lime":"red";
+        ctx.lineWidth=3;
+        ctx.beginPath();
+        ctx.moveTo(l[0],l[1]);
+        ctx.lineTo(l[2],l[3]);
+        ctx.stroke();
+    });
+
+    /* STATUS */
+    document.getElementById("obj").innerText =
+        "Objects: " + (data.objects||[]).length;
+
+        document.getElementById("lane").innerText =
+    data.lane_detected ? "LANE DETECTED" : "NO LANE";
+
+    document.getElementById("weather").innerText =
+        "Weather: " + (data.weather || "Clear");
+
+    drawGrid(data.objects);
+}
+
+/* GRID WITH LOW/HIGH LOGIC FIXED */
+function drawGrid(objects){
+
+    const rows=8, cols=8;
+    const cw=900/cols;
+    const ch=600/rows;
+
+    let grid=Array.from({length:rows},()=>Array(cols).fill("HIGH"));
+
+    (objects||[]).forEach(o=>{
+        if(!o.x1) return;
+
+        let cs=Math.floor(o.x1/cw);
+        let ce=Math.floor(o.x2/cw);
+        let rs=Math.floor(o.y1/ch);
+        let re=Math.floor(o.y2/ch);
+
+        for(let r=rs;r<=re;r++){
+            for(let c=cs;c<=ce;c++){
+                if(grid[r]) grid[r][c]="LOW";
+            }
+        }
+    });
+
+    for(let r=0;r<rows;r++){
+        for(let c=0;c<cols;c++){
+
+            let x=c*cw;
+            let y=r*ch;
+
+            if(grid[r][c]==="LOW"){
+                ctx.fillStyle=bright?"rgba(255,0,0,0.35)":"rgba(255,0,0,0.2)";
+                ctx.fillRect(x,y,cw,ch);
+
+                ctx.fillStyle="red";
+                ctx.fillText("LOW",x+5,y+15);
+            }else{
+                ctx.fillStyle="rgba(0,255,255,0.05)";
+                ctx.fillText("HIGH",x+5,y+15);
+            }
+
+            ctx.strokeStyle="rgba(0,255,255,0.1)";
+            ctx.strokeRect(x,y,cw,ch);
+        }
+    }
+}
+
+/* LOOP */
+setInterval(sendFrame,200);
+
+</script>
+
+</body>
+</html>
