@@ -193,56 +193,52 @@
 
         </div>
     </div>
+<script>
 
-    <script>
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
 
-        const IMPORTANT = {
-            vehicle: ["car", "truck", "bus"],
-            person: ["person"],
-            twowheel: ["bicycle", "motorcycle"],
-            animal: ["dog", "cat", "cow", "horse", "sheep"],
-            signal: ["traffic light", "stop sign"]
-        };
+canvas.width = 900;
+canvas.height = 600;
 
-        let systemEnabled = false, showStream = true, lastSpoken = 0;
+let bright=false;
 
-        const video = document.getElementById("video");
-        const canvas = document.getElementById("canvas");
-        const ctx = canvas.getContext("2d");
+/* IMPORTANT CLASSES */
+const IMPORTANT = [
+    "car","truck","bus",
+    "person",
+    "bicycle","motorcycle",
+    "traffic light","stop sign",
+    "dog","cat","cow","horse","sheep"
+];
 
-        canvas.width = 900; canvas.height = 600;
+/* toggle */
+document.getElementById("bright").onclick=()=>{
+    bright=!bright;
+    document.getElementById("bright").classList.toggle("active");
+};
 
-        /* TOGGLE */
-        systemToggle.onclick = () => {
-            systemEnabled = !systemEnabled;
-            systemToggle.classList.toggle("active");
-        };
+/* 🔥 IMPROVED CAMERA QUALITY */
+navigator.mediaDevices.getUserMedia({
+    video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        frameRate: { ideal: 30 }
+    }
+})
+.then(stream=>{
+    video.srcObject = stream;
+})
+.catch(()=>{
+    return navigator.mediaDevices.getUserMedia({video:true});
+})
+.then(stream=>{
+    video.srcObject = stream;
+});
 
-        function enterSystem() {
-            if (!systemEnabled) return alert("Enable system");
-            startScreen.style.display = "none";
-            mainUI.style.display = "block";
-
-            navigator.mediaDevices.getUserMedia({ video: true })
-                .then(s => video.srcObject = s);
-        }
-
-        /* STREAM */
-        streamToggle.onclick = () => {
-            showStream = !showStream;
-            streamToggle.classList.toggle("active");
-            overlayMsg.style.display = showStream ? "none" : "flex";
-        };
-
-        /* VOICE */
-        function speak(msg, priority = false) {
-            let now = Date.now();
-            if (!priority && now - lastSpoken < 3000) return;
-            speechSynthesis.speak(new SpeechSynthesisUtterance(msg));
-            lastSpoken = now;
-        }
-
-        /* DETECT LOOP */
+/* SEND FRAME */
 function sendFrame(){
 
     const temp=document.createElement("canvas");
@@ -250,6 +246,9 @@ function sendFrame(){
     temp.height=600;
 
     const tctx=temp.getContext("2d");
+
+    // 🔥 IMPROVE CONTRAST (helps YOLO)
+    tctx.filter = "contrast(1.2) brightness(1.1)";
     tctx.drawImage(video,0,0,900,600);
 
     temp.toBlob(blob=>{
@@ -257,92 +256,124 @@ function sendFrame(){
         const form=new FormData();
         form.append("image",blob,"frame.jpg");
 
+        const start = performance.now();
+
         fetch("https://hdadbprjct.duckdns.org/detect",{
             method:"POST",
             body:form
         })
         .then(r=>r.json())
-        .then(draw)
-        .catch(e=>console.log(e));
+        .then(data=>{
 
-    },"image/jpeg");
+            const end = performance.now();
+            const timeTaken = (end - start).toFixed(0);
+
+            draw(data,timeTaken);
+        })
+        .catch(e=>{
+            console.log("API ERROR:",e);
+        });
+
+    },"image/jpeg",0.7); // 🔥 compression helps speed
 }
 
-        /* DRAW */
-        function draw(data) {
+/* DRAW */
+function draw(data,time){
 
-            ctx.clearRect(0, 0, 900, 600);
-            if (showStream) ctx.drawImage(video, 0, 0);
+    ctx.clearRect(0,0,900,600);
+    ctx.drawImage(video,0,0,900,600);
 
-            let count = { person: 0, vehicle: 0, twowheel: 0, animal: 0, signal: 0 };
-            let danger = false;
+    let validObjects = [];
 
-            (data.objects || []).forEach(o => {
+    /* FILTER IMPORTANT CLASSES */
+    (data.objects||[]).forEach(o=>{
+        if(IMPORTANT.includes(o.label.toLowerCase())){
+            validObjects.push(o);
 
-                let l = o.label.toLowerCase();
+            ctx.strokeStyle="#00e5ff";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(o.x1,o.y1,o.x2-o.x1,o.y2-o.y1);
 
-                for (let k in IMPORTANT) {
-                    if (IMPORTANT[k].includes(l)) count[k]++;
-                }
+            let text = o.label.toUpperCase();
+            let w = ctx.measureText(text).width;
 
-                /* DISTANCE LOGIC */
-                let area = (o.x2 - o.x1) * (o.y2 - o.y1);
+            ctx.fillStyle="rgba(0,229,255,0.25)";
+            ctx.fillRect(o.x1,o.y1-25,w+10,20);
 
-                let color = "cyan";
-                if (area > 60000) { color = "red"; danger = true; }
-                else if (area > 20000) color = "yellow";
-
-                if (showStream) {
-                    ctx.strokeStyle = color;
-                    ctx.lineWidth = 2;
-                    ctx.strokeRect(o.x1, o.y1, o.x2 - o.x1, o.y2 - o.y1);
-                }
-            });
-
-            /* UPDATE COUNTS */
-            person.innerText = "Persons: " + count.person;
-            vehicle.innerText = "Vehicles: " + count.vehicle;
-            twowheel.innerText = "Two-Wheelers: " + count.twowheel;
-            animal.innerText = "Animals: " + count.animal;
-            signal.innerText = "Signals: " + count.signal;
-
-            /* ALERT SYSTEM */
-            if (danger) {
-                dangerOverlay.style.display = "flex";
-                speak("Brake immediately", true);
-            } else {
-                dangerOverlay.style.display = "none";
-
-                if (count.person > 0) speak("Pedestrian detected");
-                else if (count.animal > 0) speak("Animal ahead");
-                else if (count.vehicle > 0) speak("Vehicle ahead");
-                else if (count.twowheel > 0) speak("Two wheeler nearby");
-            }
-
-            /* LANE */
-            if (data.lane_detected) {
-                laneStatus.innerText = "LANE DETECTED";
-                laneStatus.style.color = "lime";
-            } else {
-                laneStatus.innerText = "NO LANE";
-                laneStatus.style.color = "red";
-            }
-
-            /* WEATHER */
-            let w = (data.weather || "clear").toLowerCase();
-            weatherText.innerText = w.toUpperCase();
-
-            weatherIcon.innerText =
-                w.includes("rain") ? "🌧️" :
-                    w.includes("cloud") ? "☁️" :
-                        w.includes("fog") ? "🌫️" : "☀️";
-
+            ctx.fillStyle="#00e5ff";
+            ctx.fillText(text,o.x1+5,o.y1-5);
         }
+    });
 
-        /* LOOP */
-        setInterval(sendFrame, 300);
+    /* LANES */
+    (data.lanes||[]).forEach((l,i)=>{
+        ctx.strokeStyle=i?"lime":"red";
+        ctx.lineWidth=3;
+        ctx.beginPath();
+        ctx.moveTo(l[0],l[1]);
+        ctx.lineTo(l[2],l[3]);
+        ctx.stroke();
+    });
 
-    </script>
+    /* STATUS */
+    document.getElementById("obj").innerText =
+        "Objects: " + validObjects.length;
+
+    document.getElementById("lane").innerText =
+        data.lane_detected ? "LANE DETECTED" : "NO LANE";
+
+    document.getElementById("weather").innerText =
+        "Weather: " + (data.weather || "Clear") + " | " + time + " ms";
+
+    drawGrid(validObjects);
+}
+
+/* GRID */
+function drawGrid(objects){
+
+    const rows=8, cols=8;
+    const cw=900/cols;
+    const ch=600/rows;
+
+    let grid=Array.from({length:rows},()=>Array(cols).fill("HIGH"));
+
+    objects.forEach(o=>{
+        let cs=Math.floor(o.x1/cw);
+        let ce=Math.floor(o.x2/cw);
+        let rs=Math.floor(o.y1/ch);
+        let re=Math.floor(o.y2/ch);
+
+        for(let r=rs;r<=re;r++){
+            for(let c=cs;c<=ce;c++){
+                if(grid[r]) grid[r][c]="LOW";
+            }
+        }
+    });
+
+    for(let r=0;r<rows;r++){
+        for(let c=0;c<cols;c++){
+
+            let x=c*cw;
+            let y=r*ch;
+
+            if(grid[r][c]==="LOW"){
+                ctx.fillStyle=bright?"rgba(255,0,0,0.35)":"rgba(255,0,0,0.2)";
+                ctx.fillRect(x,y,cw,ch);
+                ctx.fillStyle="red";
+                ctx.fillText("LOW",x+5,y+15);
+            }
+
+            ctx.strokeStyle="rgba(0,255,255,0.1)";
+            ctx.strokeRect(x,y,cw,ch);
+        }
+    }
+}
+
+/* LOOP (slightly slower = stable) */
+setInterval(sendFrame,300);
+
+</script>
+  
 
 </body>
 
