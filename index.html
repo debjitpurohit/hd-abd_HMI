@@ -1,214 +1,10 @@
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>HD-ADB Tesla UI</title>
-
-<style>
-body{
-    margin:0;
-    background:#05070c;
-    font-family:Arial;
-    color:white;
-}
-
-/* START SCREEN */
-#startScreen{
-    height:100vh;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    justify-content:center;
-    background:#05070c;
-    position:absolute;
-    width:100%;
-    z-index:10;
-}
-
-.toggle{
-    width:50px;
-    height:25px;
-    background:#333;
-    border-radius:25px;
-    position:relative;
-    cursor:pointer;
-    margin-top:10px;
-}
-
-.toggle::after{
-    content:"";
-    width:20px;
-    height:20px;
-    background:white;
-    position:absolute;
-    top:2.5px;
-    left:3px;
-    border-radius:50%;
-    transition:0.3s;
-}
-
-.toggle.active{
-    background:#00e5ff;
-}
-.toggle.active::after{
-    left:25px;
-}
-
-/* HEADER */
-.header{
-    height:60px;
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    padding:0 20px;
-    background:rgba(10,15,25,0.9);
-    border-bottom:1px solid rgba(255,255,255,0.1);
-}
-
-.header h1{
-    color:#00e5ff;
-    font-size:15px;
-}
-
-/* LAYOUT */
-.container{
-    display:flex;
-    height:calc(100vh - 60px);
-}
-
-/* LEFT PANEL */
-.left{
-    width:250px;
-    background:rgba(20,25,40,0.6);
-    padding:15px;
-}
-
-.card{
-    background:rgba(255,255,255,0.05);
-    padding:12px;
-    margin-bottom:10px;
-    border-radius:10px;
-}
-
-.status{
-    font-size:13px;
-    margin:5px 0;
-}
-
-/* RIGHT */
-.right{
-    flex:1;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-}
-
-/* CAMERA BOX */
-.box{
-    width:900px;
-    height:600px;
-    position:relative;
-    border-radius:15px;
-    overflow:hidden;
-    border:1px solid rgba(0,229,255,0.3);
-}
-
-/* VIDEO */
-video, canvas{
-    position:absolute;
-    width:100%;
-    height:100%;
-    object-fit:cover;
-}
-
-/* GRID */
-.grid{
-    position:absolute;
-    width:100%;
-    height:100%;
-    pointer-events:none;
-    background:
-        linear-gradient(rgba(0,255,255,0.08) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0,255,255,0.08) 1px, transparent 1px);
-    background-size:90px 75px;
-}
-
-/* HUD */
-.controls{
-    position:absolute;
-    right:10px;
-    top:10px;
-    width:180px;
-    background:rgba(0,0,0,0.4);
-    padding:10px;
-    border-radius:10px;
-    font-size:12px;
-    border:1px solid rgba(0,255,255,0.2);
-}
-</style>
-</head>
-
-<body>
-
-<!-- START SCREEN -->
-<div id="startScreen">
-    <h1 style="color:#00e5ff;">HD-ADB SYSTEM</h1>
-    <div>ENABLE SYSTEM</div>
-    <div class="toggle" id="systemToggle"></div>
-
-    <button onclick="enterSystem()" style="
-        margin-top:20px;
-        padding:10px 25px;
-        background:#00e5ff;
-        border:none;
-        border-radius:20px;">
-        ENTER
-    </button>
-</div>
-
-<!-- MAIN UI -->
-<div id="mainUI" style="display:none;">
-
-<div class="header">
-    <h1>HD-ADB MATRIX SYSTEM</h1>
-    <div>AUTONOMOUS HUD</div>
-</div>
-
-<div class="container">
-
-<!-- LEFT -->
-<div class="left">
-    <div class="card">
-        <div class="status" id="obj">Objects: 0</div>
-        <div class="status" id="lane">Lane: --</div>
-        <div class="status" id="weather">Weather: --</div>
-    </div>
-</div>
-
-<!-- RIGHT -->
-<div class="right">
-<div class="box">
-
-    <video id="video" autoplay playsinline></video>
-    <canvas id="canvas"></canvas>
-    <div class="grid"></div>
-
-    <div class="controls">
-        <div>System: ACTIVE</div>
-    </div>
-
-</div>
-</div>
-
-</div>
-</div>
-
 <script>
 
 document.addEventListener("DOMContentLoaded", ()=>{
 
 let systemEnabled = false;
+let lastSpoken = 0;
+let messageTimeout = null;
 
 const toggle = document.getElementById("systemToggle");
 const startScreen = document.getElementById("startScreen");
@@ -222,6 +18,14 @@ const IMPORTANT = [
     "traffic light","stop sign",
     "dog","cat","cow","horse","sheep"
 ];
+
+/* CATEGORY GROUPING */
+const CATEGORY = {
+    person:["person"],
+    vehicle:["car","truck","bus"],
+    twowheel:["bicycle","motorcycle"],
+    animal:["dog","cat","cow","horse","sheep"]
+};
 
 /* TOGGLE */
 toggle.addEventListener("click", ()=>{
@@ -271,6 +75,28 @@ const ctx = canvas.getContext("2d");
 canvas.width = 900;
 canvas.height = 600;
 
+/* 🔊 VOICE FUNCTION */
+function speak(msg){
+    let now = Date.now();
+    if(now - lastSpoken < 3000) return;
+
+    speechSynthesis.speak(new SpeechSynthesisUtterance(msg));
+    lastSpoken = now;
+}
+
+/* 📢 LEFT MESSAGE */
+function showMessage(text, fallbackCount){
+    const obj = document.getElementById("obj");
+
+    obj.innerText = text;
+
+    if(messageTimeout) clearTimeout(messageTimeout);
+
+    messageTimeout = setTimeout(()=>{
+        obj.innerText = "Objects: " + fallbackCount;
+    },5000);
+}
+
 /* SEND FRAME */
 function sendFrame(){
 
@@ -310,15 +136,26 @@ function draw(data,time){
     ctx.drawImage(video,0,0,900,600);
 
     let valid=[];
+    let count = {person:0,vehicle:0,twowheel:0,animal:0};
 
     (data.objects||[]).forEach(o=>{
-        if(IMPORTANT.includes(o.label.toLowerCase())){
+        let label = o.label.toLowerCase();
+
+        if(IMPORTANT.includes(label)){
             valid.push(o);
 
+            /* COUNT */
+            for(let k in CATEGORY){
+                if(CATEGORY[k].includes(label)){
+                    count[k]++;
+                }
+            }
+
+            /* DRAW BOX */
             ctx.strokeStyle="#00e5ff";
             ctx.strokeRect(o.x1,o.y1,o.x2-o.x1,o.y2-o.y1);
 
-            let text=o.label.toUpperCase();
+            let text=label.toUpperCase();
             let w=ctx.measureText(text).width;
 
             ctx.fillStyle="rgba(0,229,255,0.25)";
@@ -329,24 +166,34 @@ function draw(data,time){
         }
     });
 
-    /* LANES */
-    (data.lanes||[]).forEach((l,i)=>{
-        ctx.strokeStyle=i?"lime":"red";
-        ctx.lineWidth=3;
-        ctx.beginPath();
-        ctx.moveTo(l[0],l[1]);
-        ctx.lineTo(l[2],l[3]);
-        ctx.stroke();
-    });
+    /* 🔊 VOICE + MESSAGE */
+    if(count.person>0){
+        speak(count.person+" person detected");
+        showMessage(count.person+" Person Detected", valid.length);
+    }
+    else if(count.vehicle>0){
+        speak(count.vehicle+" vehicle detected");
+        showMessage(count.vehicle+" Vehicle Detected", valid.length);
+    }
+    else if(count.animal>0){
+        speak(count.animal+" animal detected");
+        showMessage(count.animal+" Animal Detected", valid.length);
+    }
 
-    /* STATUS */
-    document.getElementById("obj").innerText="Objects: "+valid.length;
+    /* 🛣️ LANE */
+    document.getElementById("lane").innerText =
+        data.lane_detected ? "🟢 LANE DETECTED" : "🔴 NO LANE";
 
-    document.getElementById("lane").innerText=
-        data.lane_detected ? "LANE DETECTED" : "NO LANE";
+    /* 🌦️ WEATHER */
+    let weather=(data.weather||"clear").toLowerCase();
+    let icon="☀️";
 
-    document.getElementById("weather").innerText=
-        "Weather: "+(data.weather||"Clear")+" | "+time+" ms";
+    if(weather.includes("rain")) icon="🌧️";
+    else if(weather.includes("cloud")) icon="☁️";
+    else if(weather.includes("fog")) icon="🌫️";
+
+    document.getElementById("weather").innerText =
+        icon+" "+weather.toUpperCase()+" | "+time+" ms";
 
     drawGrid(valid);
 }
@@ -396,6 +243,3 @@ setInterval(sendFrame,300);
 });
 
 </script>
-
-</body>
-</html>
