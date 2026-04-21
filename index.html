@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>HD-ADB Advanced System</title>
+
+    <style>
+        body {
+            margin: 0;
+            background: #05070c;
+            color: white;
+            font-family: Arial;
+        }
+
+        #startScreen {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #05070c;
+            position: absolute;
+            width: 100%;
+            z-index: 10;
+        }
+
+        .header {
+            height: 60px;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            background: #0a0f19;
+        }
+
+        .container {
+            display: flex;
+            height: calc(100vh - 60px);
+        }
+
+        .left {
+            width: 260px;
+            padding: 15px;
+            background: #141928;
+        }
+
+        .card {
+            background: #ffffff10;
+            padding: 12px;
+            border-radius: 10px;
+        }
+
+        .right {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .box {
+            width: 900px;
+            height: 600px;
+            position: relative;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+
+        video,
+        canvas {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #overlayMsg,
+        #dangerOverlay {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 5;
+            font-size: 30px;
+        }
+
+        #overlayMsg {
+            background: #000000cc;
+        }
+
+        #dangerOverlay {
+            background: rgba(255, 0, 0, 0.4);
+            font-weight: bold;
+        }
+
+        .controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 220px;
+            background: #00000088;
+            padding: 10px;
+            border-radius: 10px;
+        }
+
+        .toggle {
+            width: 50px;
+            height: 25px;
+            background: #333;
+            border-radius: 25px;
+            position: relative;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .toggle::after {
+            content: "";
+            width: 20px;
+            height: 20px;
+            background: white;
+            position: absolute;
+            top: 2.5px;
+            left: 3px;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+
+        .toggle.active {
+            background: #00e5ff;
+        }
+
+        .toggle.active::after {
+            left: 25px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- START -->
+    <div id="startScreen">
+        <h1 style="color:#00e5ff;">HD-ADB SYSTEM</h1>
+        <div>ENABLE SYSTEM</div>
+        <div class="toggle" id="systemToggle"></div>
+
+        <button onclick="enterSystem()"
+            style="margin-top:20px;padding:10px 25px;background:#00e5ff;border:none;border-radius:20px;">
+            ENTER
+        </button>
+    </div>
+
+    <!-- MAIN -->
+    <div id="mainUI" style="display:none;">
+
+        <div class="header">HD-ADB LIVE</div>
+
+        <div class="container">
+
+            <div class="left">
+                <div class="card">
+                    <div id="person">Persons: 0</div>
+                    <div id="vehicle">Vehicles: 0</div>
+                    <div id="twowheel">Two-Wheelers: 0</div>
+                    <div id="animal">Animals: 0</div>
+                    <div id="signal">Signals: 0</div>
+                </div>
+            </div>
+
+            <div class="right">
+                <div class="box">
+
+                    <video id="video" autoplay></video>
+                    <canvas id="canvas"></canvas>
+
+                    <div id="overlayMsg">STREAM OFF</div>
+                    <div id="dangerOverlay">⚠️ BRAKE IMMEDIATELY</div>
+
+                    <div class="controls">
+                        <div id="laneStatus">NO LANE</div>
+
+                        <div id="weatherBox">
+                            <div id="weatherIcon">☀️</div>
+                            <div id="weatherText">Clear</div>
+                        </div>
+
+                        <div>STREAM</div>
+                        <div class="toggle" id="streamToggle"></div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+
+        const IMPORTANT = {
+            vehicle: ["car", "truck", "bus"],
+            person: ["person"],
+            twowheel: ["bicycle", "motorcycle"],
+            animal: ["dog", "cat", "cow", "horse", "sheep"],
+            signal: ["traffic light", "stop sign"]
+        };
+
+        let systemEnabled = false, showStream = true, lastSpoken = 0;
+
+        const video = document.getElementById("video");
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+
+        canvas.width = 900; canvas.height = 600;
+
+        /* TOGGLE */
+        systemToggle.onclick = () => {
+            systemEnabled = !systemEnabled;
+            systemToggle.classList.toggle("active");
+        };
+
+        function enterSystem() {
+            if (!systemEnabled) return alert("Enable system");
+            startScreen.style.display = "none";
+            mainUI.style.display = "block";
+
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(s => video.srcObject = s);
+        }
+
+        /* STREAM */
+        streamToggle.onclick = () => {
+            showStream = !showStream;
+            streamToggle.classList.toggle("active");
+            overlayMsg.style.display = showStream ? "none" : "flex";
+        };
+
+        /* VOICE */
+        function speak(msg, priority = false) {
+            let now = Date.now();
+            if (!priority && now - lastSpoken < 3000) return;
+            speechSynthesis.speak(new SpeechSynthesisUtterance(msg));
+            lastSpoken = now;
+        }
+
+        /* DETECT LOOP */
+function sendFrame(){
+
+    const temp=document.createElement("canvas");
+    temp.width=900;
+    temp.height=600;
+
+    const tctx=temp.getContext("2d");
+    tctx.drawImage(video,0,0,900,600);
+
+    temp.toBlob(blob=>{
+
+        const form=new FormData();
+        form.append("image",blob,"frame.jpg");
+
+        fetch("https://hdadbprjct.duckdns.org/detect",{
+            method:"POST",
+            body:form
+        })
+        .then(r=>r.json())
+        .then(draw)
+        .catch(e=>console.log(e));
+
+    },"image/jpeg");
+}
+
+        /* DRAW */
+        function draw(data) {
+
+            ctx.clearRect(0, 0, 900, 600);
+            if (showStream) ctx.drawImage(video, 0, 0);
+
+            let count = { person: 0, vehicle: 0, twowheel: 0, animal: 0, signal: 0 };
+            let danger = false;
+
+            (data.objects || []).forEach(o => {
+
+                let l = o.label.toLowerCase();
+
+                for (let k in IMPORTANT) {
+                    if (IMPORTANT[k].includes(l)) count[k]++;
+                }
+
+                /* DISTANCE LOGIC */
+                let area = (o.x2 - o.x1) * (o.y2 - o.y1);
+
+                let color = "cyan";
+                if (area > 60000) { color = "red"; danger = true; }
+                else if (area > 20000) color = "yellow";
+
+                if (showStream) {
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(o.x1, o.y1, o.x2 - o.x1, o.y2 - o.y1);
+                }
+            });
+
+            /* UPDATE COUNTS */
+            person.innerText = "Persons: " + count.person;
+            vehicle.innerText = "Vehicles: " + count.vehicle;
+            twowheel.innerText = "Two-Wheelers: " + count.twowheel;
+            animal.innerText = "Animals: " + count.animal;
+            signal.innerText = "Signals: " + count.signal;
+
+            /* ALERT SYSTEM */
+            if (danger) {
+                dangerOverlay.style.display = "flex";
+                speak("Brake immediately", true);
+            } else {
+                dangerOverlay.style.display = "none";
+
+                if (count.person > 0) speak("Pedestrian detected");
+                else if (count.animal > 0) speak("Animal ahead");
+                else if (count.vehicle > 0) speak("Vehicle ahead");
+                else if (count.twowheel > 0) speak("Two wheeler nearby");
+            }
+
+            /* LANE */
+            if (data.lane_detected) {
+                laneStatus.innerText = "LANE DETECTED";
+                laneStatus.style.color = "lime";
+            } else {
+                laneStatus.innerText = "NO LANE";
+                laneStatus.style.color = "red";
+            }
+
+            /* WEATHER */
+            let w = (data.weather || "clear").toLowerCase();
+            weatherText.innerText = w.toUpperCase();
+
+            weatherIcon.innerText =
+                w.includes("rain") ? "🌧️" :
+                    w.includes("cloud") ? "☁️" :
+                        w.includes("fog") ? "🌫️" : "☀️";
+
+        }
+
+        /* LOOP */
+        setInterval(sendFrame, 300);
+
+    </script>
+
+</body>
+
+</html>
