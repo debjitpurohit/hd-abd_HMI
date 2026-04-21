@@ -19,10 +19,6 @@ body{
     flex-direction:column;
     align-items:center;
     justify-content:center;
-    background:#05070c;
-    position:absolute;
-    width:100%;
-    z-index:10;
 }
 
 .toggle{
@@ -34,7 +30,6 @@ body{
     cursor:pointer;
     margin-top:10px;
 }
-
 .toggle::after{
     content:"";
     width:20px;
@@ -46,15 +41,10 @@ body{
     border-radius:50%;
     transition:0.3s;
 }
+.toggle.active{ background:#00e5ff; }
+.toggle.active::after{ left:25px; }
 
-.toggle.active{
-    background:#00e5ff;
-}
-.toggle.active::after{
-    left:25px;
-}
-
-/* HEADER */
+/* MAIN UI */
 .header{
     height:60px;
     display:flex;
@@ -62,48 +52,29 @@ body{
     align-items:center;
     padding:0 20px;
     background:rgba(10,15,25,0.9);
-    border-bottom:1px solid rgba(255,255,255,0.1);
 }
 
-.header h1{
-    color:#00e5ff;
-    font-size:15px;
-}
+.container{ display:flex; height:calc(100vh - 60px); }
 
-/* LAYOUT */
-.container{
-    display:flex;
-    height:calc(100vh - 60px);
-}
-
-/* LEFT PANEL */
 .left{
     width:250px;
     background:rgba(20,25,40,0.6);
     padding:15px;
 }
-
 .card{
     background:rgba(255,255,255,0.05);
     padding:12px;
-    margin-bottom:10px;
     border-radius:10px;
 }
+.status{ margin:5px 0; }
 
-.status{
-    font-size:13px;
-    margin:5px 0;
-}
-
-/* RIGHT */
 .right{
     flex:1;
     display:flex;
-    align-items:center;
     justify-content:center;
+    align-items:center;
 }
 
-/* CAMERA BOX */
 .box{
     width:900px;
     height:600px;
@@ -113,7 +84,6 @@ body{
     border:1px solid rgba(0,229,255,0.3);
 }
 
-/* VIDEO */
 video, canvas{
     position:absolute;
     width:100%;
@@ -121,7 +91,6 @@ video, canvas{
     object-fit:cover;
 }
 
-/* GRID */
 .grid{
     position:absolute;
     width:100%;
@@ -133,40 +102,29 @@ video, canvas{
     background-size:90px 75px;
 }
 
-/* HUD */
 .controls{
     position:absolute;
     right:10px;
     top:10px;
-    width:180px;
-    background:rgba(0,0,0,0.4);
+    background:rgba(0,0,0,0.5);
     padding:10px;
     border-radius:10px;
     font-size:12px;
-    border:1px solid rgba(0,255,255,0.2);
 }
 </style>
 </head>
 
 <body>
 
-<!-- START SCREEN -->
+<!-- START -->
 <div id="startScreen">
     <h1 style="color:#00e5ff;">HD-ADB SYSTEM</h1>
     <div>ENABLE SYSTEM</div>
     <div class="toggle" id="systemToggle"></div>
-
-    <button onclick="enterSystem()" style="
-        margin-top:20px;
-        padding:10px 25px;
-        background:#00e5ff;
-        border:none;
-        border-radius:20px;">
-        ENTER
-    </button>
+    <button onclick="enterSystem()" style="margin-top:20px;">ENTER</button>
 </div>
 
-<!-- MAIN UI -->
+<!-- MAIN -->
 <div id="mainUI" style="display:none;">
 
 <div class="header">
@@ -176,70 +134,53 @@ video, canvas{
 
 <div class="container">
 
-<!-- LEFT -->
 <div class="left">
     <div class="card">
-        <div class="status" id="obj">Objects: 0</div>
-        <div class="status" id="lane">Lane: --</div>
-        <div class="status" id="weather">Weather: --</div>
+        <div id="obj">Objects: 0</div>
+        <div id="lane">Lane: --</div>
+        <div id="weather">Weather: --</div>
     </div>
 </div>
 
-<!-- RIGHT -->
 <div class="right">
 <div class="box">
-
     <video id="video" autoplay playsinline></video>
     <canvas id="canvas"></canvas>
     <div class="grid"></div>
 
-    <div class="controls">
-        <div>System: ACTIVE</div>
+    <div class="controls" id="summary">
+        No objects
     </div>
-
 </div>
 </div>
 
 </div>
 </div>
+
 <script>
-
 document.addEventListener("DOMContentLoaded", ()=>{
 
-let systemEnabled = false;
-let lastSpoken = 0;
-let messageTimeout = null;
+let systemEnabled=false;
+let lastSpoken=0;
+let msgTimeout=null;
 
-const toggle = document.getElementById("systemToggle");
-const startScreen = document.getElementById("startScreen");
-const mainUI = document.getElementById("mainUI");
+const toggle=document.getElementById("systemToggle");
 
-/* IMPORTANT CLASSES */
-const IMPORTANT = [
-    "car","truck","bus",
-    "person",
-    "bicycle","motorcycle",
-    "traffic light","stop sign",
-    "dog","cat","cow","horse","sheep"
-];
-
-/* CATEGORY GROUPING */
-const CATEGORY = {
+/* CATEGORY */
+const CATEGORY={
     person:["person"],
     vehicle:["car","truck","bus"],
-    twowheel:["bicycle","motorcycle"],
     animal:["dog","cat","cow","horse","sheep"]
 };
 
 /* TOGGLE */
-toggle.addEventListener("click", ()=>{
-    systemEnabled = !systemEnabled;
+toggle.onclick=()=>{
+    systemEnabled=!systemEnabled;
     toggle.classList.toggle("active");
-});
+};
 
 /* ENTER */
-window.enterSystem = function(){
-
+window.enterSystem=function(){
     if(!systemEnabled){
         alert("Enable system first");
         return;
@@ -248,203 +189,106 @@ window.enterSystem = function(){
     startScreen.style.display="none";
     mainUI.style.display="block";
 
-    startCamera();
+    navigator.mediaDevices.getUserMedia({video:true})
+    .then(s=>video.srcObject=s);
 };
 
-/* CAMERA */
-function startCamera(){
-    navigator.mediaDevices.getUserMedia({
-        video:{
-            facingMode:{ideal:"environment"},
-            width:{ideal:1280},
-            height:{ideal:720}
-        }
-    })
-    .then(stream=>{
-        video.srcObject = stream;
-    })
-    .catch(()=>{
-        navigator.mediaDevices.getUserMedia({video:true})
-        .then(stream=>{
-            video.srcObject = stream;
-        });
-    });
-}
-
-/* CANVAS */
-const video = document.getElementById("video");
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
-
-canvas.width = 900;
-canvas.height = 600;
-
-/* 🔊 VOICE FUNCTION */
+/* VOICE */
 function speak(msg){
-    let now = Date.now();
-    if(now - lastSpoken < 3000) return;
-
+    let now=Date.now();
+    if(now-lastSpoken<3000) return;
     speechSynthesis.speak(new SpeechSynthesisUtterance(msg));
-    lastSpoken = now;
+    lastSpoken=now;
 }
 
-/* 📢 LEFT MESSAGE */
-function showMessage(text, fallbackCount){
-    const obj = document.getElementById("obj");
+/* LEFT MESSAGE */
+function showMsg(text,count){
+    const obj=document.getElementById("obj");
+    obj.innerText=text;
 
-    obj.innerText = text;
-
-    if(messageTimeout) clearTimeout(messageTimeout);
-
-    messageTimeout = setTimeout(()=>{
-        obj.innerText = "Objects: " + fallbackCount;
+    if(msgTimeout) clearTimeout(msgTimeout);
+    msgTimeout=setTimeout(()=>{
+        obj.innerText="Objects: "+count;
     },5000);
 }
 
 /* SEND FRAME */
 function sendFrame(){
 
-    const temp=document.createElement("canvas");
-    temp.width=900;
-    temp.height=600;
+    let t=document.createElement("canvas");
+    t.width=900; t.height=600;
 
-    const tctx=temp.getContext("2d");
-    tctx.filter="contrast(1.2) brightness(1.1)";
-    tctx.drawImage(video,0,0,900,600);
+    let tc=t.getContext("2d");
+    tc.drawImage(video,0,0,900,600);
 
-    temp.toBlob(blob=>{
+    t.toBlob(b=>{
+        let f=new FormData();
+        f.append("image",b);
 
-        const form=new FormData();
-        form.append("image",blob);
-
-        const start=performance.now();
-
-        fetch("https://hdadbprjct.duckdns.org/detect",{
-            method:"POST",
-            body:form
-        })
+        fetch("https://hdadbprjct.duckdns.org/detect",{method:"POST",body:f})
         .then(r=>r.json())
-        .then(data=>{
-            const time=(performance.now()-start).toFixed(0);
-            draw(data,time);
-        })
-        .catch(e=>console.log(e));
-
+        .then(draw);
     },"image/jpeg",0.7);
 }
 
 /* DRAW */
-function draw(data,time){
+function draw(data){
 
-    ctx.clearRect(0,0,900,600);
     ctx.drawImage(video,0,0,900,600);
 
-    let valid=[];
-    let count = {person:0,vehicle:0,twowheel:0,animal:0};
+    let count={person:0,vehicle:0,animal:0};
 
     (data.objects||[]).forEach(o=>{
-        let label = o.label.toLowerCase();
+        let l=o.label.toLowerCase();
 
-        if(IMPORTANT.includes(label)){
-            valid.push(o);
-
-            /* COUNT */
-            for(let k in CATEGORY){
-                if(CATEGORY[k].includes(label)){
-                    count[k]++;
-                }
-            }
-
-            /* DRAW BOX */
-            ctx.strokeStyle="#00e5ff";
-            ctx.strokeRect(o.x1,o.y1,o.x2-o.x1,o.y2-o.y1);
-
-            let text=label.toUpperCase();
-            let w=ctx.measureText(text).width;
-
-            ctx.fillStyle="rgba(0,229,255,0.25)";
-            ctx.fillRect(o.x1,o.y1-25,w+10,20);
-
-            ctx.fillStyle="#00e5ff";
-            ctx.fillText(text,o.x1+5,o.y1-5);
+        for(let k in CATEGORY){
+            if(CATEGORY[k].includes(l)) count[k]++;
         }
+
+        ctx.strokeStyle="#00e5ff";
+        ctx.strokeRect(o.x1,o.y1,o.x2-o.x1,o.y2-o.y1);
+        ctx.fillText(l.toUpperCase(),o.x1,o.y1-5);
     });
 
-    /* 🔊 VOICE + MESSAGE */
-    if(count.person>0){
-        speak(count.person+" person detected");
-        showMessage(count.person+" Person Detected", valid.length);
-    }
-    else if(count.vehicle>0){
-        speak(count.vehicle+" vehicle detected");
-        showMessage(count.vehicle+" Vehicle Detected", valid.length);
-    }
-    else if(count.animal>0){
-        speak(count.animal+" animal detected");
-        showMessage(count.animal+" Animal Detected", valid.length);
+    /* BUILD MESSAGE */
+    let parts=[];
+    if(count.person) parts.push(count.person+" person");
+    if(count.vehicle) parts.push(count.vehicle+" vehicle");
+    if(count.animal) parts.push(count.animal+" animal");
+
+    let msg=parts.join(" | ");
+
+    if(parts.length){
+        showMsg(msg.toUpperCase()+" DETECTED", parts.length);
+        speak(parts.join(" and ")+" detected");
+        document.getElementById("summary").innerText=msg;
     }
 
-    /* 🛣️ LANE */
-    document.getElementById("lane").innerText =
+    /* LANE */
+    document.getElementById("lane").innerText=
         data.lane_detected ? "🟢 LANE DETECTED" : "🔴 NO LANE";
 
-    /* 🌦️ WEATHER */
-    let weather=(data.weather||"clear").toLowerCase();
+    /* WEATHER */
+    let w=(data.weather||"clear").toLowerCase();
     let icon="☀️";
+    if(w.includes("rain")) icon="🌧️";
+    else if(w.includes("cloud")) icon="☁️";
+    else if(w.includes("fog")) icon="🌫️";
 
-    if(weather.includes("rain")) icon="🌧️";
-    else if(weather.includes("cloud")) icon="☁️";
-    else if(weather.includes("fog")) icon="🌫️";
-
-    document.getElementById("weather").innerText =
-        icon+" "+weather.toUpperCase()+" | "+time+" ms";
-
-    drawGrid(valid);
+    document.getElementById("weather").innerText=icon+" "+w.toUpperCase();
 }
 
-/* GRID */
-function drawGrid(objects){
+const video=document.getElementById("video");
+const canvas=document.getElementById("canvas");
+const ctx=canvas.getContext("2d");
 
-    const rows=8, cols=8;
-    const cw=900/cols;
-    const ch=600/rows;
+canvas.width=900;
+canvas.height=600;
 
-    let grid=Array.from({length:rows},()=>Array(cols).fill("HIGH"));
-
-    objects.forEach(o=>{
-        let cs=Math.floor(o.x1/cw);
-        let ce=Math.floor(o.x2/cw);
-        let rs=Math.floor(o.y1/ch);
-        let re=Math.floor(o.y2/ch);
-
-        for(let r=rs;r<=re;r++){
-            for(let c=cs;c<=ce;c++){
-                if(grid[r]) grid[r][c]="LOW";
-            }
-        }
-    });
-
-    for(let r=0;r<rows;r++){
-        for(let c=0;c<cols;c++){
-
-            let x=c*cw;
-            let y=r*ch;
-
-            if(grid[r][c]==="LOW"){
-                ctx.fillStyle="rgba(255,0,0,0.25)";
-                ctx.fillRect(x,y,cw,ch);
-            }
-
-            ctx.strokeStyle="rgba(0,255,255,0.1)";
-            ctx.strokeRect(x,y,cw,ch);
-        }
-    }
-}
-
-/* LOOP */
 setInterval(sendFrame,300);
 
 });
-
 </script>
+
 </body>
+</html>
