@@ -10,70 +10,73 @@ body{
     background:#05070c;
     font-family:Arial;
     color:white;
-    overflow:hidden;
 }
 
-/* HEADER */
+/* START SCREEN */
+#startScreen{
+    height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+}
+
+.toggle{
+    width:50px;
+    height:25px;
+    background:#333;
+    border-radius:25px;
+    position:relative;
+    cursor:pointer;
+    margin-top:10px;
+}
+.toggle::after{
+    content:"";
+    width:20px;
+    height:20px;
+    background:white;
+    position:absolute;
+    top:2px;
+    left:3px;
+    border-radius:50%;
+    transition:0.3s;
+}
+.toggle.active{background:#00e5ff;}
+.toggle.active::after{left:25px;}
+
+/* MAIN UI */
 .header{
     height:60px;
     display:flex;
     justify-content:space-between;
-    align-items:center;
     padding:0 20px;
-    background:rgba(10,15,25,0.9);
-    border-bottom:1px solid rgba(255,255,255,0.1);
+    align-items:center;
 }
 
-.header h1{
-    color:#00e5ff;
-    font-size:15px;
-}
+.container{display:flex;height:calc(100vh - 60px);}
 
-/* LAYOUT */
-.container{
-    display:flex;
-    height:calc(100vh - 60px);
-}
-
-/* LEFT PANEL (INFO) */
 .left{
     width:250px;
-    background:rgba(20,25,40,0.6);
     padding:15px;
+    background:rgba(20,25,40,0.6);
 }
 
-.card{
-    background:rgba(255,255,255,0.05);
-    padding:12px;
-    margin-bottom:10px;
-    border-radius:10px;
-}
-
-.status{
-    font-size:13px;
-    margin:5px 0;
-}
-
-/* RIGHT PANEL */
 .right{
     flex:1;
     display:flex;
-    align-items:center;
     justify-content:center;
-    position:relative;
+    align-items:center;
 }
 
-/* CAMERA BOX */
 .box{
     width:900px;
     height:600px;
     position:relative;
+    border:1px solid rgba(0,229,255,0.3);
     border-radius:15px;
     overflow:hidden;
-    border:1px solid rgba(0,229,255,0.3);
 }
 
-/* VIDEO + CANVAS */
 video, canvas{
     position:absolute;
     width:100%;
@@ -81,140 +84,116 @@ video, canvas{
     object-fit:cover;
 }
 
-/* GRID */
-.grid{
-    position:absolute;
-    width:100%;
-    height:100%;
-    pointer-events:none;
-    background:
-        linear-gradient(rgba(0,255,255,0.08) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0,255,255,0.08) 1px, transparent 1px);
-    background-size:90px 75px;
-}
-
-/* RIGHT CONTROL HUD */
 .controls{
     position:absolute;
     right:10px;
     top:10px;
-    width:180px;
-    background:rgba(0,0,0,0.4);
+    background:rgba(0,0,0,0.5);
     padding:10px;
     border-radius:10px;
-    font-size:12px;
-    border:1px solid rgba(0,255,255,0.2);
-}
-
-.toggle{
-    width:40px;
-    height:20px;
-    background:#333;
-    border-radius:20px;
-    position:relative;
-    cursor:pointer;
-    margin-top:5px;
-}
-
-.toggle::after{
-    content:"";
-    width:16px;
-    height:16px;
-    background:white;
-    position:absolute;
-    top:2px;
-    left:2px;
-    border-radius:50%;
-    transition:0.3s;
-}
-
-.toggle.active{
-    background:#00e5ff;
-}
-
-.toggle.active::after{
-    left:22px;
 }
 </style>
 </head>
 
 <body>
 
+<!-- START -->
+<div id="startScreen">
+    <h1 style="color:#00e5ff;">HD-ADB SYSTEM</h1>
+    <div>ENABLE SYSTEM</div>
+    <div class="toggle" id="systemToggle"></div>
+    <button onclick="enterSystem()" style="margin-top:20px;">ENTER</button>
+</div>
+
+<!-- MAIN -->
+<div id="mainUI" style="display:none;">
+
 <div class="header">
     <h1>HD-ADB MATRIX SYSTEM</h1>
-    <div>AUTONOMOUS HUD</div>
 </div>
 
 <div class="container">
 
-<!-- LEFT INFO -->
 <div class="left">
-    <div class="card">
-        <div class="status" id="obj">Objects: 0</div>
-        <div class="status" id="lane">Lane: --</div>
-        <div class="status" id="weather">Weather: --</div>
-    </div>
+    <div id="obj">Objects: 0</div>
+    <div id="lane">Lane: --</div>
+    <div id="weather">Weather: --</div>
 </div>
 
-<!-- RIGHT CAMERA -->
 <div class="right">
-
 <div class="box">
 
     <video id="video" autoplay playsinline></video>
     <canvas id="canvas"></canvas>
-    <div class="grid"></div>
 
-    <!-- RIGHT HUD CONTROLS -->
     <div class="controls">
-        <div>Brightness</div>
-        <div class="toggle" id="bright"></div>
-
-        <div style="margin-top:10px;">Mode: AUTO</div>
-        <div>System: ACTIVE</div>
+        <div>Stream</div>
+        <div class="toggle" id="streamToggle"></div>
     </div>
 
 </div>
-
 </div>
 
+</div>
 </div>
 
 <script>
+document.addEventListener("DOMContentLoaded", ()=>{
 
-const video = document.getElementById("video");
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
+let enabled=false;
+let streamOn=true;
+let lastVoice=0;
 
-canvas.width = 900;
-canvas.height = 600;
+const video=document.getElementById("video");
+const canvas=document.getElementById("canvas");
+const ctx=canvas.getContext("2d");
 
-let bright=false;
+canvas.width=900;
+canvas.height=600;
 
-/* toggle */
-document.getElementById("bright").onclick=()=>{
-    bright=!bright;
-    document.getElementById("bright").classList.toggle("active");
+/* CATEGORY */
+const CATEGORY={
+    person:["person"],
+    vehicle:["car","truck","bus"],
+    animal:["dog","cat","cow","horse","sheep"]
 };
 
-/* CAMERA */
-navigator.mediaDevices.getUserMedia({
-    video: {
-        facingMode: { ideal: "environment" }
-    }
-})
-.then(stream=>{
-    video.srcObject = stream;
-})
-.catch(err=>{
-    console.log("Back camera failed, using default", err);
+/* START TOGGLE */
+systemToggle.onclick=()=>{
+    enabled=!enabled;
+    systemToggle.classList.toggle("active");
+};
 
-    // fallback
-    navigator.mediaDevices.getUserMedia({ video: true })
-    .then(stream=>{
-        video.srcObject = stream;
-    });
-});
+/* ENTER */
+window.enterSystem=()=>{
+    if(!enabled){
+        alert("Enable system first");
+        return;
+    }
+
+    startScreen.style.display="none";
+    mainUI.style.display="block";
+
+    navigator.mediaDevices.getUserMedia({
+        video:{facingMode:"environment"}
+    }).then(s=>video.srcObject=s);
+};
+
+/* STREAM TOGGLE */
+streamToggle.onclick=()=>{
+    streamOn=!streamOn;
+    streamToggle.classList.toggle("active");
+
+    video.style.display = streamOn ? "block" : "none";
+};
+
+/* VOICE */
+function speak(msg){
+    let now=Date.now();
+    if(now-lastVoice<3000) return;
+    speechSynthesis.speak(new SpeechSynthesisUtterance(msg));
+    lastVoice=now;
+}
 
 /* SEND FRAME */
 function sendFrame(){
@@ -227,137 +206,73 @@ function sendFrame(){
     tctx.drawImage(video,0,0,900,600);
 
     temp.toBlob(blob=>{
-
         const form=new FormData();
-        form.append("image",blob,"frame.jpg");
-
-        // ✅ START TIME
-        const start = performance.now();
+        form.append("image",blob);
 
         fetch("https://hdadbprjct.duckdns.org/detect",{
             method:"POST",
             body:form
         })
         .then(r=>r.json())
-        .then(data=>{
-            
-            // ✅ END TIME
-            const end = performance.now();
-            const timeTaken = (end - start).toFixed(2);
-
-            console.log("Response time:", timeTaken, "ms");
-
-            // OPTIONAL: show on UI
-            document.getElementById("weather").innerText =
-                "Weather: " + (data.weather || "Clear") + " | " + timeTaken + " ms";
-
-            draw(data);
-        })
-        .catch(e=>console.log(e));
-
-    },"image/jpeg");
+        .then(draw);
+    },"image/jpeg",0.7);
 }
 
 /* DRAW */
 function draw(data){
 
     ctx.clearRect(0,0,900,600);
-    ctx.drawImage(video,0,0,900,600);
+    if(streamOn) ctx.drawImage(video,0,0,900,600);
 
-    /* OBJECTS */
-(data.objects||[]).forEach(o=>{
+    let count={person:0,vehicle:0,animal:0};
 
-    ctx.strokeStyle="#00e5ff";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(o.x1,o.y1,o.x2-o.x1,o.y2-o.y1);
+    (data.objects||[]).forEach(o=>{
+        let l=o.label.toLowerCase();
 
-    ctx.font = "bold 10px Arial";
+        for(let k in CATEGORY){
+            if(CATEGORY[k].includes(l)) count[k]++;
+        }
 
-    let text = o.label.toUpperCase();
-    let textWidth = ctx.measureText(text).width;
-
-    // background box
-    ctx.fillStyle = "rgba(0,229,255,0.25)";
-    ctx.fillRect(o.x1, o.y1 - 25, textWidth + 10, 20);
-
-    // text
-    ctx.fillStyle = "#00e5ff";
-    ctx.fillText(text, o.x1 + 5, o.y1 - 5);
-});
-
-    /* LANES */
-    (data.lanes||[]).forEach((l,i)=>{
-        ctx.strokeStyle=i?"lime":"red";
-        ctx.lineWidth=3;
-        ctx.beginPath();
-        ctx.moveTo(l[0],l[1]);
-        ctx.lineTo(l[2],l[3]);
-        ctx.stroke();
-    });
-
-    /* STATUS */
-    document.getElementById("obj").innerText =
-        "Objects: " + (data.objects||[]).length;
-
-        document.getElementById("lane").innerText =
-    data.lane_detected ? "LANE DETECTED" : "NO LANE";
-
-    document.getElementById("weather").innerText =
-        "Weather: " + (data.weather || "Clear");
-
-    drawGrid(data.objects);
-}
-
-/* GRID WITH LOW/HIGH LOGIC FIXED */
-function drawGrid(objects){
-
-    const rows=8, cols=8;
-    const cw=900/cols;
-    const ch=600/rows;
-
-    let grid=Array.from({length:rows},()=>Array(cols).fill("HIGH"));
-
-    (objects||[]).forEach(o=>{
-        if(!o.x1) return;
-
-        let cs=Math.floor(o.x1/cw);
-        let ce=Math.floor(o.x2/cw);
-        let rs=Math.floor(o.y1/ch);
-        let re=Math.floor(o.y2/ch);
-
-        for(let r=rs;r<=re;r++){
-            for(let c=cs;c<=ce;c++){
-                if(grid[r]) grid[r][c]="LOW";
-            }
+        if(streamOn){
+            ctx.strokeStyle="#00e5ff";
+            ctx.strokeRect(o.x1,o.y1,o.x2-o.x1,o.y2-o.y1);
+            ctx.fillText(l.toUpperCase(),o.x1,o.y1-5);
         }
     });
 
-    for(let r=0;r<rows;r++){
-        for(let c=0;c<cols;c++){
+    /* BUILD MESSAGE */
+    let parts=[];
+    if(count.person) parts.push(count.person+" person");
+    if(count.vehicle) parts.push(count.vehicle+" vehicle");
+    if(count.animal) parts.push(count.animal+" animal");
 
-            let x=c*cw;
-            let y=r*ch;
+    let msg=parts.join(" | ");
 
-            if(grid[r][c]==="LOW"){
-                ctx.fillStyle=bright?"rgba(255,0,0,0.35)":"rgba(255,0,0,0.2)";
-                ctx.fillRect(x,y,cw,ch);
-
-                ctx.fillStyle="red";
-                ctx.fillText("LOW",x+5,y+15);
-            }else{
-                ctx.fillStyle="rgba(0,255,255,0.05)";
-                ctx.fillText("HIGH",x+5,y+15);
-            }
-
-            ctx.strokeStyle="rgba(0,255,255,0.1)";
-            ctx.strokeRect(x,y,cw,ch);
-        }
+    if(parts.length){
+        document.getElementById("obj").innerText=msg.toUpperCase()+" DETECTED";
+        speak(parts.join(" and ")+" detected");
+    }else{
+        document.getElementById("obj").innerText="Objects: 0";
     }
+
+    /* LANE */
+    document.getElementById("lane").innerText =
+        data.lane_detected ? "🟢 LANE DETECTED" : "🔴 NO LANE";
+
+    /* WEATHER */
+    let w=(data.weather||"clear").toLowerCase();
+    let icon="☀️";
+    if(w.includes("rain")) icon="🌧️";
+    if(w.includes("cloud")) icon="☁️";
+    if(w.includes("fog")) icon="🌫️";
+
+    document.getElementById("weather").innerText=icon+" "+w.toUpperCase();
 }
 
 /* LOOP */
-setInterval(sendFrame,200);
+setInterval(sendFrame,300);
 
+});
 </script>
 
 </body>
