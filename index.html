@@ -197,10 +197,23 @@ document.getElementById("bright").onclick=()=>{
     document.getElementById("bright").classList.toggle("active");
 };
 
-/* CAMERA */
-navigator.mediaDevices.getUserMedia({video:true})
+/* CAMERA
+navigator.mediaDevices.getUserMedia({
+    video: {
+        facingMode: { ideal: "environment" }
+    }
+})
 .then(stream=>{
     video.srcObject = stream;
+})
+.catch(err=>{
+    console.log("Back camera failed, using default", err);
+
+    // fallback
+    navigator.mediaDevices.getUserMedia({ video: true })
+    .then(stream=>{
+        video.srcObject = stream;
+    });
 });
 
 /* SEND FRAME */
