@@ -218,12 +218,28 @@ function sendFrame(){
         const form=new FormData();
         form.append("image",blob,"frame.jpg");
 
+        // ✅ START TIME
+        const start = performance.now();
+
         fetch("https://hdadbprjct.duckdns.org/detect",{
             method:"POST",
             body:form
         })
         .then(r=>r.json())
-        .then(draw)
+        .then(data=>{
+            
+            // ✅ END TIME
+            const end = performance.now();
+            const timeTaken = (end - start).toFixed(2);
+
+            console.log("Response time:", timeTaken, "ms");
+
+            // OPTIONAL: show on UI
+            document.getElementById("weather").innerText =
+                "Weather: " + (data.weather || "Clear") + " | " + timeTaken + " ms";
+
+            draw(data);
+        })
         .catch(e=>console.log(e));
 
     },"image/jpeg");
